@@ -1,33 +1,32 @@
 import pygame
+import sys # Diperlukan untuk sys.exit() di layar transisi
 from settings import *
 from tile import Tile
-from level.player import Player # Pastikan player.py bisa menangani input keyboard DAN/ATAU gestur
-from level.support import * # Pastikan path ini benar jika level1.py ada di dalam folder 'level'
+from level.player import Player
+from level.support import *
 from random import choice
 from ui import UI
-# from camera import HandGestureCamera # Tidak perlu diimpor di sini jika sudah dioper dari main.py
+from button import Button # Impor kelas Button
 
-# Kelas Item Sederhana
+# Kelas Item Sederhana (tidak berubah dari sebelumnya)
 class Item(pygame.sprite.Sprite):
     def __init__(self, pos, groups, item_type, surface=None):
         super().__init__(groups)
         self.sprite_type = 'item'
         self.item_type = item_type
         
-        if surface:
+        if surface: # Gambar sudah diskalakan di create_map
             self.image = surface
         else:
-            self.image = pygame.Surface((TILESIZE, TILESIZE)) # Ukuran default
+            # Fallback jika surface tidak disediakan
+            self.image = pygame.Surface((TILESIZE, TILESIZE)) 
             if self.item_type == 'heart':
-               # Pastikan path ini benar relatif terhadap direktori kerja saat game dijalankan
                try:
-                loaded_image = pygame.image.load('graphics/items/heart.png').convert_alpha()
-                   # Skala ulang gambar agar sesuai dengan TILESIZE x TILESIZE
-                self.image = pygame.transform.scale(loaded_image, (TILESIZE, TILESIZE)) # Tambahkan/Ubah baris ini
-                
+                   loaded_image = pygame.image.load('graphics/items/heart.png').convert_alpha()
+                   self.image = pygame.transform.scale(loaded_image, (TILESIZE, TILESIZE))
                except pygame.error as e:
-                   print(f"Error loading heart item image: {e}. Using placeholder.")
-                   self.image.fill('red') # Placeholder jika gagal load
+                   print(f"Error loading heart item image in Item fallback: {e}. Using placeholder.")
+                   self.image.fill('red') 
             else:
                 self.image.fill('grey')
         
@@ -36,35 +35,36 @@ class Item(pygame.sprite.Sprite):
 
 
 class Level:
-    def __init__(self, camera_instance): # Menerima instance kamera dari main.py
-        self.display_surface = pygame.display.get_surface()
+    def __init__(self, camera_instance, screen_surface, font_renderer): # Tambahkan screen dan font
+        self.display_surface = screen_surface # Gunakan screen yang dioper
+        self.font_renderer = font_renderer # Gunakan font renderer yang dioper
         self.game_paused = False
 
-        self.visible_sprites = YSortCameraGroup()
+        self.visible_sprites = YSortCameraGroup(self.display_surface) # Oper display_surface
         self.obstacle_sprites = pygame.sprite.Group()
         self.item_sprites = pygame.sprite.Group()
 
-        self.game_camera = camera_instance # Simpan instance kamera
+        self.game_camera = camera_instance
 
-        # sprite setup
-        # self.player akan dibuat di create_map()
         self.player = None 
-        self.create_map() # Ini akan menginisialisasi self.player
+        self.create_map() 
 
-        # user interface
-        self.ui = UI()
-        if self.game_camera: # Pastikan kamera ada sebelum di-set ke UI
-            self.ui.set_camera(self.game_camera) # Oper instance kamera ke UI
+        self.ui = UI() # UI akan menggunakan display_surface dari pygame.display.get_surface() secara internal
+        if self.game_camera:
+            self.ui.set_camera(self.game_camera)
 
-        # Inisialisasi player.inventory (lebih baik di Player class __init__)
-        # Pemeriksaan ini dilakukan setelah self.player dibuat di create_map
-        if self.player: # Pastikan player sudah ada setelah create_map
+        # Tujuan Level
+        self.hearts_to_collect = 2 # Tujuan untuk Level 1
+        self.level_complete = False
+        self.proceed_to_next_level = False # Flag untuk memberi tahu main.py
+
+        if self.player:
             if not hasattr(self.player, 'inventory') or not isinstance(self.player.inventory, dict):
                 self.player.inventory = {'heart': 0}
             elif 'heart' not in self.player.inventory:
                 self.player.inventory['heart'] = 0
         else:
-            print("LEVEL WARNING: Player object not created after create_map(). UI might not function correctly.")
+            print("LEVEL WARNING: Player object not created after create_map().")
 
 
     def create_map(self):
@@ -77,7 +77,10 @@ class Level:
         graphics = {
             'grass': import_folder("graphics/grass"),
             'objects': import_folder("graphics/objects"),
-            'heart': pygame.image.load("graphics/items/heart.png").convert_alpha()
+            'heart': pygame.transform.scale( # Skala dilakukan di sini
+                pygame.image.load("graphics/items/heart.png").convert_alpha(),
+                (TILESIZE, TILESIZE) 
+            )
         }
 
         for style,layout in layouts.items():
@@ -95,34 +98,19 @@ class Level:
                             surf = graphics['objects'][int(col)]
                             Tile((x,y),[self.visible_sprites,self.obstacle_sprites],'object',surf)
                         if style == 'entities':
-                            if col == '394': # ID Pemain
-                                initial_predicted_label = 0 # Default jika kamera tidak ada atau tidak dipakai awal
-                                if self.game_camera:
-                                     # Anda mungkin ingin memanggil process sekali untuk mendapatkan label awal
-                                     # atau biarkan Player yang mengambilnya di update pertamanya.
-                                     # Untuk sekarang, kita bisa asumsikan Player akan menangani ini.
-                                     # initial_predicted_label = self.game_camera.get_predicted_label() # Jika metode ini ada di camera.py
-                                     pass
-
-
+                            if col == '394': 
                                 self.player = Player(
                                     pos=(x + TILESIZE // 2, y + TILESIZE // 2),
                                     groups=[self.visible_sprites],
                                     obstacle_sprites=self.obstacle_sprites,
-                                    # Argumen untuk gestur kamera dan input keyboard akan ditangani di Player
-                                    # Jika Player butuh instance kamera:
-                                    # camera_input=self.game_camera 
+                                    # camera_input=self.game_camera # Jika Player butuh akses langsung ke kamera
                                 )
-                                # Pastikan Player.__init__ diperbarui untuk menerima argumen baru jika ada
-                                # (misalnya, untuk kontrol keyboard atau referensi kamera)
-
-                                # Inisialisasi inventaris di sini setelah player dibuat, jika belum di Player.__init__
                                 if not hasattr(self.player, 'inventory') or not isinstance(self.player.inventory, dict):
                                     self.player.inventory = {'heart': 0}
                                 elif 'heart' not in self.player.inventory:
                                      self.player.inventory['heart'] = 0
 
-                            elif col in ['390', '391', '392', '393']: # ID Item 'heart'
+                            elif col in ['390', '391', '392', '393']: 
                                 Item(
                                     (x + TILESIZE // 2, y + TILESIZE // 2),
                                     [self.visible_sprites, self.item_sprites],
@@ -131,58 +119,134 @@ class Level:
                                 )
     
     def player_item_collection_logic(self):
-        if self.player:
-            collided_items = pygame.sprite.spritecollide(self.player, self.item_sprites, True) # True untuk dokill
+        if self.player and not self.level_complete: # Hanya proses jika level belum selesai
+            collided_items = pygame.sprite.spritecollide(self.player, self.item_sprites, True)
             for item_sprite in collided_items:
                 if item_sprite.item_type == 'heart':
-                    # Panggil metode di player untuk menambah item (praktik terbaik)
                     if hasattr(self.player, 'collect_item'):
                         self.player.collect_item('heart')
-                    else: # Fallback jika metode collect_item tidak ada di Player
+                    else: 
                         if 'heart' in self.player.inventory:
                             self.player.inventory['heart'] += 1
                         else:
                             self.player.inventory['heart'] = 1
                     print(f"Collected heart! Total: {self.player.inventory.get('heart', 0)}")
 
-    def toggle_menu(self):
+                    # Cek apakah tujuan tercapai
+                    if self.player.inventory.get('heart', 0) >= self.hearts_to_collect:
+                        self.level_complete = True
+                        print("Level 1 Objective Achieved!")
+                        # Jangan langsung tampilkan layar di sini, biarkan run() yang mengelola state
+
+    def toggle_menu(self): # Untuk menu pause
         self.game_paused = not self.game_paused
+        return "PAUSE_MENU_REQUESTED" # Memberi tahu main.py untuk menampilkan menu pause
+
+    def show_level_complete_screen(self):
+        """Menampilkan layar saat level selesai, mirip pause menu."""
+        frozen_surface = self.display_surface.copy() # Bekukan layar game saat ini
+        
+        # Font untuk layar ini (bisa dioper atau didefinisikan di sini)
+        # Menggunakan font_renderer yang dioper ke __init__
+        title_font = self.font_renderer.get_font(60) # Asumsi MainMenu.get_font ada
+        button_font = self.font_renderer.get_font(50)
+
+        while True:
+            self.display_surface.blit(frozen_surface, (0,0)) # Tampilkan game yang dibekukan
+            
+            # Tambahkan overlay semi-transparan
+            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180)) # Hitam dengan alpha 180
+            self.display_surface.blit(overlay, (0,0))
+
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Teks "Level Complete"
+            complete_text = title_font.render("Level 1 Complete!", True, TEXT_COLOR_SELECTED)
+            complete_rect = complete_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
+            self.display_surface.blit(complete_text, complete_rect)
+
+            # Tombol "Proceed to Level 2"
+            proceed_button = Button(
+                pos=(WIDTH // 2, HEIGHT // 2 + 50),
+                text="Next Level",
+                font=button_font,
+                base_color="white",
+                hover_color="lightgreen"
+            )
+            proceed_button.change_color(mouse_pos)
+            proceed_button.draw(self.display_surface)
+            
+            # Tombol "Main Menu"
+            menu_button = Button(
+                pos=(WIDTH // 2, HEIGHT // 2 + 150),
+                text="Main Menu",
+                font=button_font,
+                base_color="white",
+                hover_color="lightblue"
+            )
+            menu_button.change_color(mouse_pos)
+            menu_button.draw(self.display_surface)
+
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if proceed_button.check_click(mouse_pos):
+                        self.proceed_to_next_level = True # Set flag untuk main.py
+                        return "PROCEED_LEVEL_2" # Kembali ke run() Level, lalu ke main.py
+                    if menu_button.check_click(mouse_pos):
+                        return "RETURN_TO_MENU" # Kembali ke run() Level, lalu ke main.py
+            
+            pygame.display.update()
+            # self.clock.tick(FPS) # Clock dikelola oleh Game loop utama di main.py
 
     def run(self):
-        # Proses input kamera untuk gestur (jika digunakan)
-        if self.game_camera and self.player and hasattr(self.player, 'control_with_gesture'): 
-            # Asumsikan Player memiliki atribut/metode untuk menandakan kontrol gestur
-            if self.player.control_with_gesture: # Contoh flag di Player
-                self.game_camera.process() # Update prediksi gestur
-                predicted_label = self.game_camera.get_predicted_label() # Dapatkan label terbaru
-                if hasattr(self.player, 'set_predicted_gesture_label'):
-                    self.player.set_predicted_gesture_label(predicted_label) # Oper ke player
-                else: # Cara lama jika player masih menggunakan predicted_label secara langsung
-                    self.player.predicted_label = predicted_label
+        if self.level_complete and not self.proceed_to_next_level:
+            # Jika level selesai TAPI pemain belum memilih "Next Level" dari layar complete,
+            # tampilkan layar complete.
+            action = self.show_level_complete_screen()
+            if action == "PROCEED_LEVEL_2":
+                return "LEVEL_COMPLETE_PROCEED" # Status untuk main.py
+            elif action == "RETURN_TO_MENU":
+                return "RETURN_TO_MENU" # Status untuk main.py
 
+        if self.proceed_to_next_level: # Jika sudah memilih proceed dari layar complete
+            return "LEVEL_COMPLETE_PROCEED"
 
-        # Pemain akan menangani input keyboard di dalam metode update()-nya sendiri
-        # yang dipanggil oleh self.visible_sprites.update()
-
-        self.visible_sprites.custom_draw(self.player)
-        
-        if hasattr(self, 'ui') and self.player:
-            self.ui.display(self.player)
-
-        if self.game_paused:
-            # Logika menu pause
-            pass
-        else:
-            # Update game logic
-            self.visible_sprites.update() # Ini akan memanggil Player.update()
+        # Logika game berjalan normal jika tidak di-pause dan level belum selesai
+        if not self.game_paused:
+            if self.game_camera and self.player:
+                if hasattr(self.player, 'control_with_gesture') and self.player.control_with_gesture:
+                    self.game_camera.process() 
+                    predicted_label = self.game_camera.get_predicted_label()
+                    if hasattr(self.player, 'set_predicted_gesture_label'):
+                        self.player.set_predicted_gesture_label(predicted_label)
+                    else:
+                        self.player.predicted_label = predicted_label
+            
+            self.visible_sprites.update() 
             if self.player:
                 self.player_item_collection_logic()
+        
+        # Selalu gambar, bahkan saat pause (untuk menampilkan state terakhir sebelum pause)
+        self.visible_sprites.custom_draw(self.player)
+        if hasattr(self, 'ui') and self.player:
+            self.ui.display(self.player)
+        
+        if self.game_paused: # Jika game di-pause (misalnya dari input K_ESCAPE di main.py)
+            return "PAUSED" # Memberi tahu main.py bahwa game sedang di-pause
+            # Menu pause akan ditampilkan oleh main.py
+
+        return "RUNNING" # Status default, level masih berjalan
 
 
 class YSortCameraGroup(pygame.sprite.Group):
-    def __init__(self):
+    def __init__(self, display_surface): # Terima display_surface
         super().__init__()
-        self.display_surface = pygame.display.get_surface()
+        self.display_surface = display_surface # Gunakan surface yang dioper
         self.half_width = self.display_surface.get_size()[0] // 2
         self.half_height = self.display_surface.get_size()[1] // 2
         self.offset = pygame.math.Vector2()
@@ -192,7 +256,7 @@ class YSortCameraGroup(pygame.sprite.Group):
         except pygame.error as e:
             print(f"Error loading background image for YSortCameraGroup: {e}. Creating fallback.")
             self.floor_surf = pygame.Surface((self.display_surface.get_width(), self.display_surface.get_height()))
-            self.floor_surf.fill((30,30,30)) # Warna fallback abu-abu gelap
+            self.floor_surf.fill((30,30,30)) 
         self.floor_rect = self.floor_surf.get_rect(topleft = (0,0))
 
     def custom_draw(self,player):

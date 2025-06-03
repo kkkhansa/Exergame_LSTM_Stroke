@@ -13,7 +13,7 @@
 
 ## Improvement needed (3 June 2025)
 1. Connect the predicted gesture into keymap (character control)
-2. Resize the item
+2. Resize the item (DONE)
 3. Add fuction to handle collecting item target (objective)
 4. Add next level screen 
 5. Add trial and level 2

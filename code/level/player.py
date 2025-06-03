@@ -13,7 +13,7 @@ class Player(pygame.sprite.Sprite): # Atau class Player(Entity):
 
         # Movement
         self.direction = pygame.math.Vector2()
-        self.speed = 5 # Dari settings.py
+        self.speed = 10 # Dari settings.py
 
         self.obstacle_sprites = obstacle_sprites
         self.inventory = {'heart': 0} # Inisialisasi inventaris di sini
