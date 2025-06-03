@@ -14,9 +14,10 @@
 ## Improvement needed (3 June 2025)
 1. Connect the predicted gesture into keymap (character control)
 2. Resize the item (DONE)
-3. Add fuction to handle collecting item target (objective)
-4. Add next level screen 
-5. Add trial and level 2
+3. Add fuction to handle collecting item target (objective) (DONE)
+4. Add next level screen (DONE)
+5. Add trial and level 2 (DONE)
+6. Optional: fix tiles to center
 
 ## Notes
 The hand gesture used in this exergame is based on stroke patients needs, focusing on MMT 3-5. Further development needed.

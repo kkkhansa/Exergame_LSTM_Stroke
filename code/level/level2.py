@@ -135,7 +135,7 @@ class Level:
                     # Cek apakah tujuan tercapai
                     if self.player.inventory.get('heart', 0) >= self.hearts_to_collect:
                         self.level_complete = True
-                        print("Level 1 Objective Achieved!")
+                        print("Level 2 Objective Achieved!")
                         # Jangan langsung tampilkan layar di sini, biarkan run() yang mengelola state
 
     def toggle_menu(self): # Untuk menu pause
@@ -163,20 +163,11 @@ class Level:
             mouse_pos = pygame.mouse.get_pos()
 
             # Teks "Level Complete"
-            complete_text = title_font.render("Level 1 Complete!", True, 'white')
+            complete_text = title_font.render("Level 2 Complete!", True, 'white')
             complete_rect = complete_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
             self.display_surface.blit(complete_text, complete_rect)
 
-            # Tombol "Proceed to Level 2"
-            proceed_button = Button(
-                pos=(WIDTH // 2, HEIGHT // 2 + 50),
-                text="Next Level",
-                font=button_font,
-                base_color="white",
-                hover_color="lightgreen"
-            )
-            proceed_button.change_color(mouse_pos)
-            proceed_button.draw(self.display_surface)
+
             
             # Tombol "Main Menu"
             menu_button = Button(
@@ -195,9 +186,6 @@ class Level:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    if proceed_button.check_click(mouse_pos):
-                        self.proceed_to_next_level = True # Set flag untuk main.py
-                        return "PROCEED_LEVEL_2" # Kembali ke run() Level, lalu ke main.py
                     if menu_button.check_click(mouse_pos):
                         return "RETURN_TO_MENU" # Kembali ke run() Level, lalu ke main.py
             
