@@ -46,12 +46,17 @@ class Game:
 
     def run(self):
         while True:
-            # Event handling umum (bisa dipindahkan ke fungsi terpisah jika kompleks)
-            for event in pygame.event.get():
+            # Event handling umum
+            for event in pygame.event.get(): # Get all events
                 if event.type == pygame.QUIT:
                     if self.camera: self.camera.release()
                     pygame.quit()
                     sys.exit()
+                
+                # Pass event to active level if it exists and has a handler
+                if self.active_level_instance and hasattr(self.active_level_instance, 'handle_event'):
+                    self.active_level_instance.handle_event(event) # Call the level's event handler
+
                 
                 if self.current_game_state == "PLAYING_LEVEL" and event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:

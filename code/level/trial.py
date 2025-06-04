@@ -1,14 +1,14 @@
 import pygame
-import sys
+import sys 
 from settings import *
 from tile import Tile
-from level.player import Player # Assuming player.py is in the 'level' folder
-from level.support import * # Assuming support.py is in the 'level' folder
+from level.player import Player 
+from level.support import * 
 from random import choice
 from ui import UI
-from button import Button
+from button import Button 
 
-# Kelas Item Sederhana (sama seperti di level1.py)
+# Kelas Item (asumsikan tidak berubah)
 class Item(pygame.sprite.Sprite):
     def __init__(self, pos, groups, item_type, surface=None):
         super().__init__(groups)
@@ -32,40 +32,52 @@ class Item(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=pos)
         self.hitbox = self.rect.inflate(0, 0)
 
-class TrialLevel: # Renamed class to TrialLevel
+class TrialLevel:
     def __init__(self, camera_instance, screen_surface, font_renderer):
         self.display_surface = screen_surface
-        self.font_renderer = font_renderer # For potential future use, not strictly needed if no complete screen
-        self.game_paused = False # Internal pause state, main.py handles game-wide pause state
+        self.font_renderer = font_renderer
+        self.game_paused = False
 
         self.visible_sprites = YSortCameraGroup(self.display_surface)
         self.obstacle_sprites = pygame.sprite.Group()
         self.item_sprites = pygame.sprite.Group()
 
-        self.game_camera = camera_instance
+        self.game_camera = camera_instance 
         self.player = None 
         self.create_map() 
 
         self.ui = UI()
         if self.game_camera:
-            self.ui.set_camera(self.game_camera)
-
-        # No specific item collection goal for trial level
-        # self.hearts_to_collect = X 
-        # self.level_complete = False
-        # self.proceed_to_next_level = False
+            self.ui.set_camera(self.game_camera) 
 
         if self.player:
             if not hasattr(self.player, 'inventory') or not isinstance(self.player.inventory, dict):
                 self.player.inventory = {'heart': 0}
-            elif 'heart' not in self.player.inventory: # Ensure 'heart' key exists
+            elif 'heart' not in self.player.inventory:
                 self.player.inventory['heart'] = 0
         else:
             print("TRIAL LEVEL WARNING: Player object not created after create_map().")
 
+        # --- Manual Gesture Input for Debugging ---
+        self.manual_gesture_input_mode = True 
+        self.last_manual_label = 5 # Default to Idle (label 5)
+        self.awaiting_manual_gesture_input = False # New flag
+
+        if self.manual_gesture_input_mode:
+            print("-" * 30)
+            print("MANUAL GESTURE INPUT MODE ENABLED FOR TRIAL LEVEL")
+            print("Focus Pygame window, press 'M' to trigger terminal input prompt.")
+            print("Player Gesture Labels (Ensure player.py matches this):")
+            print("  0: Up -> open palm")
+            print("  1: Right -> thumb_index")
+            print("  2: Down -> closed fist")
+            print("  3: Left -> grabbing")
+            print("  5: Idle / No specific gesture")
+            print("-" * 30)
+        # --- End Manual Gesture Input ---
+
+
     def create_map(self):
-        # Using the same map layout as Level 1 for simplicity
-        # You can change these paths if you have a specific map for the trial level
         layouts = {
             'boundary': import_csv_layout("map/map_FloorBlocks.csv"),
             'grass': import_csv_layout("map/map_Grass.csv"),
@@ -101,13 +113,12 @@ class TrialLevel: # Renamed class to TrialLevel
                                     pos=(x + TILESIZE // 2, y + TILESIZE // 2),
                                     groups=[self.visible_sprites],
                                     obstacle_sprites=self.obstacle_sprites,
-                                    # camera_input=self.game_camera # Pass camera if Player needs it
+                                    camera_input=self.game_camera 
                                 )
                                 if not hasattr(self.player, 'inventory') or not isinstance(self.player.inventory, dict):
                                     self.player.inventory = {'heart': 0}
                                 elif 'heart' not in self.player.inventory:
                                      self.player.inventory['heart'] = 0
-                            # Items can still exist and be collected, but no goal attached
                             elif col in ['390', '391', '392', '393']: 
                                 Item(
                                     (x + TILESIZE // 2, y + TILESIZE // 2),
@@ -117,7 +128,6 @@ class TrialLevel: # Renamed class to TrialLevel
                                 )
     
     def player_item_collection_logic(self):
-        # Player can collect items, but it doesn't trigger level completion
         if self.player:
             collided_items = pygame.sprite.spritecollide(self.player, self.item_sprites, True)
             for item_sprite in collided_items:
@@ -129,45 +139,69 @@ class TrialLevel: # Renamed class to TrialLevel
                             self.player.inventory['heart'] += 1
                         else:
                             self.player.inventory['heart'] = 1
-                    print(f"Trial: Collected heart! Total: {self.player.inventory.get('heart', 0)}")
-                    # No check for self.hearts_to_collect or setting self.level_complete
+                    # print(f"Trial: Collected heart! Total: {self.player.inventory.get('heart', 0)}")
 
-    # toggle_menu is not strictly needed if main.py handles pause state changes
-    # def toggle_menu(self):
-    #     self.game_paused = not self.game_paused
-    #     return "PAUSE_MENU_REQUESTED" 
+    def handle_event(self, event):
+        """Handles events specifically for the trial level, like toggling manual input."""
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_m:
+                if self.manual_gesture_input_mode:
+                    self.awaiting_manual_gesture_input = True # Signal to prompt in terminal
+                    print("TrialLevel: 'M' pressed. Will prompt for label in terminal at start of next run() cycle.")
+                else: # Toggle manual mode on/off
+                    self.manual_gesture_input_mode = True
+                    print("MANUAL GESTURE INPUT MODE ENABLED. Press 'M' in Pygame window to input label.")
+                    if self.game_camera:
+                         self.last_manual_label = self.game_camera.get_predicted_label()
+                    else:
+                        self.last_manual_label = 5 # Default to idle
+            elif event.key == pygame.K_n: # Example: Key to toggle manual mode off
+                if self.manual_gesture_input_mode:
+                    self.manual_gesture_input_mode = False
+                    self.awaiting_manual_gesture_input = False # Ensure no pending prompt
+                    print("MANUAL GESTURE INPUT MODE DISABLED. Using camera.")
 
-    # show_level_complete_screen is not needed for trial level
-    # def show_level_complete_screen(self): ...
 
     def run(self):
-        # Trial level runs until paused and exited via main.py's pause menu.
-        # It doesn't have its own "complete" state that leads to another level.
+        # --- Manual Input Prompt (if flagged) ---
+        if self.manual_gesture_input_mode and self.awaiting_manual_gesture_input:
+            try:
+                print("-" * 10) # Visual separator in terminal
+                raw_label = input(f"Enter gesture label (current: {self.last_manual_label}, 0:Up, 1:Right, 2:Down, 3:Left, 5:Idle): ")
+                self.last_manual_label = int(raw_label)
+                print(f"Manual label set to: {self.last_manual_label}")
+            except ValueError:
+                print("Invalid input. Please enter a number. Using previous label.")
+            except Exception as e:
+                print(f"Error during manual input: {e}. Using previous label.")
+            finally:
+                self.awaiting_manual_gesture_input = False # Reset flag
 
-        # Logika game berjalan normal jika tidak di-pause (main.py's game_paused)
-        # self.game_paused (internal level pause) is not used here as main.py controls overall pause
+        # --- Determine Predicted Label ---
+        predicted_label_for_player = 5 # Default to Idle
+        if self.manual_gesture_input_mode:
+            predicted_label_for_player = self.last_manual_label
+        elif self.game_camera: 
+            self.game_camera.process() 
+            predicted_label_for_player = self.game_camera.get_predicted_label()
         
-        if self.game_camera and self.player:
-            if hasattr(self.player, 'control_with_gesture') and self.player.control_with_gesture:
-                self.game_camera.process() 
-                predicted_label = self.game_camera.get_predicted_label()
-                if hasattr(self.player, 'set_predicted_gesture_label'):
-                    self.player.set_predicted_gesture_label(predicted_label)
-                else:
-                    self.player.predicted_label = predicted_label
+        # --- Update Player with Label ---
+        if self.player:
+            if hasattr(self.player, 'set_predicted_gesture_label'):
+                self.player.set_predicted_gesture_label(predicted_label_for_player)
+            else: # Fallback
+                self.player.predicted_label = predicted_label_for_player
         
+        # --- Standard Game Logic ---
         self.visible_sprites.update() 
         if self.player:
             self.player_item_collection_logic()
         
+        # --- Drawing ---
         self.visible_sprites.custom_draw(self.player)
-        if hasattr(self, 'ui') and self.player:
+        if hasattr(self, 'ui') and self.player: 
             self.ui.display(self.player)
         
-        # TrialLevel's run method will be called repeatedly by main.py's PLAYING_LEVEL state.
-        # If main.py changes state (e.g., to PAUSE_MENU or MENU), then this run loop effectively ends for TrialLevel.
-        # It doesn't need to return a special "complete" status.
-        # "PAUSED" can be returned if an in-level event triggers a pause, but K_ESCAPE is handled by main.py
         return "RUNNING" 
 
 

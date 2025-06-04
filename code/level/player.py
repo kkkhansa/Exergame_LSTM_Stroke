@@ -56,6 +56,7 @@ class Player(pygame.sprite.Sprite):
 
         if can_move_now:
             # Kontrol Keyboard
+            # commented out to avoid confusion with gesture control (debugging purposes)
             if keys[pygame.K_UP] or keys[pygame.K_w]:
                 attempted_move_dy_tile = -1
                 self.status = 'up' 
@@ -78,19 +79,19 @@ class Player(pygame.sprite.Sprite):
 
             # Kontrol Gestur
             if not keyboard_input_made and self.control_with_gesture and self.game_camera:
-                if self.predicted_label == 1: # Atas
+                if self.predicted_label == 0 : # Atas
                     attempted_move_dy_tile = -1
                     self.status = 'up'
                 elif self.predicted_label == 2: # Bawah
                     attempted_move_dy_tile = 1
                     self.status = 'down'
                 # Tambahkan gestur untuk kiri/kanan jika diperlukan
-                # elif self.predicted_label == 3 and attempted_move_dy_tile == 0: # Kiri
-                #     attempted_move_dx_tile = -1
-                #     self.status = 'left'
-                # elif self.predicted_label == 4 and attempted_move_dy_tile == 0: # Kanan
-                #     attempted_move_dx_tile = 1
-                #     self.status = 'right'
+                elif self.predicted_label == 3 and attempted_move_dy_tile == 0: # Kiri
+                    attempted_move_dx_tile = -1
+                    self.status = 'left'
+                elif self.predicted_label == 4 and attempted_move_dy_tile == 0: # Kanan
+                    attempted_move_dx_tile = 1
+                    self.status = 'right'
             
             if attempted_move_dx_tile != 0 or attempted_move_dy_tile != 0:
                 # Calculate target center position
