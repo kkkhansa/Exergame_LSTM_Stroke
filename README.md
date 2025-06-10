@@ -18,9 +18,12 @@
 4 June 2025:
 1. Add debugging for gesture control
 
+10 June 2025:
+1. Add new model
+2. Add hand gesture control
+
 ## Improvement needed (4 June 2025)
-1. Connect the predicted gesture into keymap (character control) (Partially done, need adjustment)
-2. Optional: fix tiles to center
+1. Optional: fix tiles to center
 
 ## Notes
 The hand gesture used in this exergame is based on stroke patients needs, focusing on MMT 3-5. Further development needed.

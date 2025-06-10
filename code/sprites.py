@@ -31,7 +31,7 @@ class Player(pygame.sprite.Sprite):
         
         # Movement
         self.direction = pygame.math.Vector2()
-        self.speed = 5
+        self.speed = 0.2
         self.obstacle_sprites = obstacle_sprites
         
         # Inventory

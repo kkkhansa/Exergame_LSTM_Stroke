@@ -82,14 +82,14 @@ class Player(pygame.sprite.Sprite):
                 if self.predicted_label == 0 : # Atas
                     attempted_move_dy_tile = -1
                     self.status = 'up'
-                elif self.predicted_label == 2: # Bawah
+                elif self.predicted_label == 1: # Bawah
                     attempted_move_dy_tile = 1
                     self.status = 'down'
                 # Tambahkan gestur untuk kiri/kanan jika diperlukan
                 elif self.predicted_label == 3 and attempted_move_dy_tile == 0: # Kiri
                     attempted_move_dx_tile = -1
                     self.status = 'left'
-                elif self.predicted_label == 4 and attempted_move_dy_tile == 0: # Kanan
+                elif self.predicted_label == 2 and attempted_move_dy_tile == 0: # Kanan
                     attempted_move_dx_tile = 1
                     self.status = 'right'
             

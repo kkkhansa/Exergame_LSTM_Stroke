@@ -54,7 +54,7 @@ class Level:
             self.ui.set_camera(self.game_camera)
 
         # Tujuan Level
-        self.hearts_to_collect = 1 # Tujuan untuk Level 1
+        self.hearts_to_collect = 5 # Tujuan untuk Level 2
         self.level_complete = False
         self.proceed_to_next_level = False # Flag untuk memberi tahu main.py
 
@@ -65,7 +65,24 @@ class Level:
                 self.player.inventory['heart'] = 0
         else:
             print("LEVEL WARNING: Player object not created after create_map().")
+        
+        # --- Manual Gesture Input for Debugging (from trial.py) ---
+        self.manual_gesture_input_mode = True 
+        self.last_manual_label = 5 # Default to Idle (label 5)
+        self.awaiting_manual_gesture_input = False # New flag
 
+        if self.manual_gesture_input_mode:
+            print("-" * 30)
+            print("MANUAL GESTURE INPUT MODE ENABLED FOR LEVEL 2")
+            print("Focus Pygame window, press 'M' to trigger terminal input prompt.")
+            print("Player Gesture Labels (Ensure player.py matches this):")
+            print("  0: Up -> open palm")
+            print("  1: Right -> thumb_index")
+            print("  2: Down -> closed fist")
+            print("  3: Left -> grabbing")
+            print("  5: Idle / No specific gesture")
+            print("-" * 30)
+        # --- End Manual Gesture Input ---
 
     def create_map(self):
         layouts = {
@@ -103,7 +120,7 @@ class Level:
                                     pos=(x + TILESIZE // 2, y + TILESIZE // 2),
                                     groups=[self.visible_sprites],
                                     obstacle_sprites=self.obstacle_sprites,
-                                    # camera_input=self.game_camera # Jika Player butuh akses langsung ke kamera
+                                    camera_input=self.game_camera
                                 )
                                 if not hasattr(self.player, 'inventory') or not isinstance(self.player.inventory, dict):
                                     self.player.inventory = {'heart': 0}
@@ -138,6 +155,26 @@ class Level:
                         print("Level 2 Objective Achieved!")
                         # Jangan langsung tampilkan layar di sini, biarkan run() yang mengelola state
 
+    def handle_event(self, event):
+        """Handles events specifically for the level, like toggling manual input."""
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_m:
+                if self.manual_gesture_input_mode:
+                    self.awaiting_manual_gesture_input = True
+                    print("Level 2: 'M' pressed. Will prompt for label in terminal at start of next run() cycle.")
+                else: 
+                    self.manual_gesture_input_mode = True
+                    print("MANUAL GESTURE INPUT MODE ENABLED. Press 'M' in Pygame window to input label. Press 'N' to use camera.")
+                    if self.game_camera:
+                         self.last_manual_label = self.game_camera.get_predicted_label()
+                    else:
+                        self.last_manual_label = 5 
+            elif event.key == pygame.K_n:
+                if self.manual_gesture_input_mode:
+                    self.manual_gesture_input_mode = False
+                    self.awaiting_manual_gesture_input = False
+                    print("MANUAL GESTURE INPUT MODE DISABLED. Using camera.")
+
     def toggle_menu(self): # Untuk menu pause
         self.game_paused = not self.game_paused
         return "PAUSE_MENU_REQUESTED" # Memberi tahu main.py untuk menampilkan menu pause
@@ -146,30 +183,22 @@ class Level:
         """Menampilkan layar saat level selesai, mirip pause menu."""
         frozen_surface = self.display_surface.copy() # Bekukan layar game saat ini
         
-        # Font untuk layar ini (bisa dioper atau didefinisikan di sini)
-        # Menggunakan font_renderer yang dioper ke __init__
-        title_font = self.font_renderer.get_font(60) # Asumsi MainMenu.get_font ada
+        title_font = self.font_renderer.get_font(60) 
         button_font = self.font_renderer.get_font(50)
 
         while True:
-            self.display_surface.blit(frozen_surface, (0,0)) # Tampilkan game yang dibekukan
+            self.display_surface.blit(frozen_surface, (0,0)) 
             
-            
-            # Tambahkan overlay semi-transparan
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180)) # Hitam dengan alpha 180
             self.display_surface.blit(overlay, (0,0))
 
             mouse_pos = pygame.mouse.get_pos()
 
-            # Teks "Level Complete"
             complete_text = title_font.render("Level 2 Complete!", True, 'white')
             complete_rect = complete_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
             self.display_surface.blit(complete_text, complete_rect)
-
-
             
-            # Tombol "Main Menu"
             menu_button = Button(
                 pos=(WIDTH // 2, HEIGHT // 2 + 150),
                 text="Main Menu",
@@ -180,56 +209,64 @@ class Level:
             menu_button.change_color(mouse_pos)
             menu_button.draw(self.display_surface)
 
-
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if menu_button.check_click(mouse_pos):
-                        return "RETURN_TO_MENU" # Kembali ke run() Level, lalu ke main.py
+                        return "RETURN_TO_MENU"
             
             pygame.display.update()
-            # self.clock.tick(FPS) # Clock dikelola oleh Game loop utama di main.py
 
     def run(self):
         if self.level_complete and not self.proceed_to_next_level:
-            # Jika level selesai TAPI pemain belum memilih "Next Level" dari layar complete,
-            # tampilkan layar complete.
             action = self.show_level_complete_screen()
-            if action == "PROCEED_LEVEL_2":
-                return "LEVEL_COMPLETE_PROCEED" # Status untuk main.py
-            elif action == "RETURN_TO_MENU":
-                return "RETURN_TO_MENU" # Status untuk main.py
+            if action == "RETURN_TO_MENU":
+                return "RETURN_TO_MENU" 
 
-        if self.proceed_to_next_level: # Jika sudah memilih proceed dari layar complete
-            return "LEVEL_COMPLETE_PROCEED"
-
-        # Logika game berjalan normal jika tidak di-pause dan level belum selesai
         if not self.game_paused:
-            if self.game_camera and self.player:
-                if hasattr(self.player, 'control_with_gesture') and self.player.control_with_gesture:
-                    self.game_camera.process() 
-                    predicted_label = self.game_camera.get_predicted_label()
-                    if hasattr(self.player, 'set_predicted_gesture_label'):
-                        self.player.set_predicted_gesture_label(predicted_label)
-                    else:
-                        self.player.predicted_label = predicted_label
+            # --- Manual Input Prompt (from trial.py) ---
+            if self.manual_gesture_input_mode and self.awaiting_manual_gesture_input:
+                try:
+                    print("-" * 10)
+                    raw_label = input(f"Enter gesture label (current: {self.last_manual_label}, 0:Up, 1:Right, 2:Down, 3:Left, 5:Idle): ")
+                    self.last_manual_label = int(raw_label)
+                    print(f"Manual label set to: {self.last_manual_label}")
+                except ValueError:
+                    print("Invalid input. Please enter a number. Using previous label.")
+                except Exception as e:
+                    print(f"Error during manual input: {e}. Using previous label.")
+                finally:
+                    self.awaiting_manual_gesture_input = False 
+
+            # --- Determine Predicted Label (from trial.py) ---
+            predicted_label_for_player = 5 # Default to Idle
+            if self.manual_gesture_input_mode:
+                predicted_label_for_player = self.last_manual_label
+            elif self.game_camera: 
+                self.game_camera.process() 
+                predicted_label_for_player = self.game_camera.get_predicted_label()
+            
+            # --- Update Player with Label (from trial.py) ---
+            if self.player:
+                if hasattr(self.player, 'set_predicted_gesture_label'):
+                    self.player.set_predicted_gesture_label(predicted_label_for_player)
+                else: 
+                    self.player.predicted_label = predicted_label_for_player
             
             self.visible_sprites.update() 
             if self.player:
                 self.player_item_collection_logic()
         
-        # Selalu gambar, bahkan saat pause (untuk menampilkan state terakhir sebelum pause)
         self.visible_sprites.custom_draw(self.player)
         if hasattr(self, 'ui') and self.player:
             self.ui.display(self.player)
         
-        if self.game_paused: # Jika game di-pause (misalnya dari input K_ESCAPE di main.py)
-            return "PAUSED" # Memberi tahu main.py bahwa game sedang di-pause
-            # Menu pause akan ditampilkan oleh main.py
-
-        return "RUNNING" # Status default, level masih berjalan
+        if self.game_paused: 
+            return "PAUSED"
+            
+        return "RUNNING"
 
 
 class YSortCameraGroup(pygame.sprite.Group):

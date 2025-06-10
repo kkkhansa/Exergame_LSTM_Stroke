@@ -68,11 +68,11 @@ class TrialLevel:
             print("MANUAL GESTURE INPUT MODE ENABLED FOR TRIAL LEVEL")
             print("Focus Pygame window, press 'M' to trigger terminal input prompt.")
             print("Player Gesture Labels (Ensure player.py matches this):")
-            print("  0: Up -> open palm")
-            print("  1: Right -> thumb_index")
-            print("  2: Down -> closed fist")
-            print("  3: Left -> grabbing")
-            print("  5: Idle / No specific gesture")
+            # print("  0: Up -> open palm")
+            # print("  1: Right -> thumb_index")
+            # print("  2: Down -> closed fist")
+            # print("  3: Left -> grabbing")
+            # print("  5: Idle / No specific gesture")
             print("-" * 30)
         # --- End Manual Gesture Input ---
 
@@ -150,7 +150,7 @@ class TrialLevel:
                     print("TrialLevel: 'M' pressed. Will prompt for label in terminal at start of next run() cycle.")
                 else: # Toggle manual mode on/off
                     self.manual_gesture_input_mode = True
-                    print("MANUAL GESTURE INPUT MODE ENABLED. Press 'M' in Pygame window to input label.")
+                    print("MANUAL GESTURE INPUT MODE ENABLED. Press 'M' in Pygame window to input label. Press 'N' to use camera.")
                     if self.game_camera:
                          self.last_manual_label = self.game_camera.get_predicted_label()
                     else:
