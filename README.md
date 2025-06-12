@@ -22,6 +22,10 @@
 1. Add new model
 2. Add hand gesture control
 
+12 June 2025:
+1. Add dwell time
+2. Fix objective UI
+
 ## Improvement needed (4 June 2025)
 1. Optional: fix tiles to center
 
