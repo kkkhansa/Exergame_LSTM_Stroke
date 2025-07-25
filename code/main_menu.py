@@ -113,7 +113,7 @@ class MainMenu:
             self.screen.fill("black")
             mouse_pos = pygame.mouse.get_pos()
 
-            title = self.get_font(80).render("LEVELS", True, TEXT_COLOR_SELECTED)
+            title = self.get_font(80).render("LEVELS", True, 'white')
             title_rect = title.get_rect(center=(WIDTH//2, 100))
             self.screen.blit(title, title_rect)
 

@@ -52,7 +52,7 @@ class Level:
         if self.game_camera:
             self.ui.set_camera(self.game_camera)
 
-        self.hearts_to_collect = 2 # change as needed for the level
+        self.hearts_to_collect = 1 # change as needed for the level
         self.level_complete = False
         self.proceed_to_next_level = False
 

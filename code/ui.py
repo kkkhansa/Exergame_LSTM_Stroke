@@ -47,7 +47,10 @@ class UI:
             try:
                 cam_surface = self.camera_object.get_frame()
                 if cam_surface:
-                    cam_rect = cam_surface.get_rect(topright=(self.display_surface.get_width() - 10, 10))
+                    # Resize the camera surface to fit the UI
+                    cam_surface = pygame.transform.scale(cam_surface, (160, 120))
+                    # Draw the camera feed on the display surface
+                    cam_rect = cam_surface.get_rect(topright=(self.display_surface.get_width() - 10,10))
                     self.display_surface.blit(cam_surface, cam_rect)
                     pygame.draw.rect(self.display_surface, (255, 255, 255), cam_rect, 2)
                     

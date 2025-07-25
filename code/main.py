@@ -1,72 +1,83 @@
 import pygame, sys
+import threading # --- PERUBAHAN UNTUK DEBUGGING ---
 from settings import *
 from main_menu import MainMenu
-from level.level1 import Level as Level1 # Ubah nama impor untuk kejelasan
-from level.level2 import Level as Level2 # Anda perlu membuat file ini dan memastikan impor ini benar
-from level.trial import TrialLevel # TrialLevel untuk level percobaan, jika ada
-from camera import HandGestureCamera
-# from ui import UI # UI dikelola di dalam Level
+from level.level1 import Level as Level1
+from level.level2 import Level as Level2
+from level.trial import TrialLevel
+from camera import HandGestureCamera # Pastikan Anda menggunakan versi debug dari kamera
+from camera_debug import GameDebugger # --- PERUBAHAN UNTUK DEBUGGING ---
 
 class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption('Heart Collector') # Ganti judul game jika mau
+        pygame.display.set_caption('Heart Collector')
         self.clock = pygame.time.Clock()
         
-        self.current_game_state = "MENU" # Menggunakan nama state yang lebih deskriptif
-        self.active_level_instance = None # Untuk menyimpan instance level yang sedang berjalan
+        self.current_game_state = "MENU"
+        self.active_level_instance = None
 
         self.camera = HandGestureCamera()
-        self.main_menu = MainMenu(self.screen) # MainMenu juga akan berfungsi sebagai font_renderer
+        self.main_menu = MainMenu(self.screen)
+        
+        # --- PERUBAHAN UNTUK DEBUGGING ---
+        # Buat instance debugger dan berikan akses ke instance kamera
+        self.debugger = GameDebugger(self.camera)
+        # --------------------------------
 
-        # Placeholder untuk Level 2 - Anda perlu membuat kelas Level2
         self.level_definitions = {
-            "TRIAL": TrialLevel, # Level percobaan, jika ada
+            "TRIAL": TrialLevel,
             "LEVEL_1": Level1,
-            "LEVEL_2": Level2, # Tambahkan ini setelah Level2 dibuat dan diimpor
+            "LEVEL_2": Level2,
         }
         self.current_level_key = None
 
-
+    # ... (Metode start_level tidak perlu diubah) ...
     def start_level(self, level_key):
         if level_key in self.level_definitions:
             self.current_level_key = level_key
-            # Oper screen dan main_menu (sebagai font_renderer) ke Level
             self.active_level_instance = self.level_definitions[level_key](
                 camera_instance=self.camera,
                 screen_surface=self.screen,
-                font_renderer=self.main_menu # MainMenu memiliki metode get_font
+                font_renderer=self.main_menu
             )
             self.current_game_state = "PLAYING_LEVEL"
-            print(f"Starting {level_key}") # Pesan ini akan muncul jika level_key ada di definisi
+            print(f"Starting {level_key}")
         else:
             print(f"Error: Level key '{level_key}' not found in definitions.")
-            self.current_game_state = "MENU" # Kembali ke menu jika level tidak ditemukan
+            self.current_game_state = "MENU"
+
 
     def run(self):
+        # --- PERUBAHAN UNTUK DEBUGGING ---
+        # Jalankan debugger di thread terpisah
+        self.debugger.start()
+        # --------------------------------
+        
         while True:
-            # Event handling umum
-            for event in pygame.event.get(): # Get all events
+            # --- PERUBAHAN UNTUK DEBUGGING ---
+            # Berikan data FPS game ke instance kamera agar debugger bisa membacanya
+            # Ini lebih akurat daripada menghitung FPS di dalam thread debug itu sendiri
+            current_fps = self.clock.get_fps()
+            self.camera.game_fps = current_fps # Anda perlu menambahkan atribut ini di camera_debug.py
+            # --------------------------------
+
+            for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    if self.camera: self.camera.release()
+                    # Cleanup akan ditangani di blok finally di bawah
                     pygame.quit()
                     sys.exit()
                 
-                # Pass event to active level if it exists and has a handler
                 if self.active_level_instance and hasattr(self.active_level_instance, 'handle_event'):
-                    self.active_level_instance.handle_event(event) # Call the level's event handler
-
+                    self.active_level_instance.handle_event(event)
                 
                 if self.current_game_state == "PLAYING_LEVEL" and event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
-                        if self.active_level_instance:
-                            # Simpan layar saat ini sebelum masuk ke menu pause
-                            self.last_game_surface_before_pause = self.screen.copy()
-                            self.current_game_state = "PAUSE_MENU"
+                        self.last_game_surface_before_pause = self.screen.copy()
+                        self.current_game_state = "PAUSE_MENU"
 
-
-            # State machine utama
+            # State machine (tidak ada perubahan di sini)
             if self.current_game_state == "MENU":
                 menu_action = self.main_menu.show_main_menu()
                 if menu_action == "PLAY": 
@@ -74,21 +85,20 @@ class Game:
                 elif menu_action == "LEVELS":
                     self.current_game_state = "LEVEL_SELECT_MENU"
                 elif menu_action == "QUIT":
-                    if self.camera: self.camera.release()
                     pygame.quit()
                     sys.exit()
 
+            # ... (sisa dari state machine Anda tetap sama) ...
             elif self.current_game_state == "LEVEL_SELECT_MENU":
                 level_choice = self.main_menu.show_levels_menu()
                 if level_choice == "BACK":
                     self.current_game_state = "MENU"
-                elif level_choice == "TRIAL": # Tambahkan opsi untuk memulai Level Percobaan
+                elif level_choice == "TRIAL": 
                     self.start_level("TRIAL")
                 elif level_choice == "LEVEL_1":
                     self.start_level("LEVEL_1")
-                elif level_choice == "LEVEL_2": # Tambahkan opsi untuk memulai Level 2 dari menu level
+                elif level_choice == "LEVEL_2":
                     self.start_level("LEVEL_2")
-
 
             elif self.current_game_state == "PLAYING_LEVEL":
                 self.screen.fill("black") 
@@ -98,13 +108,8 @@ class Game:
                     if level_status == "LEVEL_COMPLETE_PROCEED":
                         print(f"{self.current_level_key} complete. Proceeding...")
                         if self.current_level_key == "LEVEL_1":
-                            self.start_level("LEVEL_2") # Aktifkan pemanggilan untuk memulai Level 2
-                        # Tambahkan logika untuk level lain jika ada, misal setelah Level 2
-                        # elif self.current_level_key == "LEVEL_2":
-                        #     print("Level 2 complete! Congratulations!")
-                        #     self.active_level_instance = None 
-                        #     self.current_game_state = "MENU" 
-                        else: # Jika tidak ada level berikutnya yang didefinisikan setelah level saat ini
+                            self.start_level("LEVEL_2")
+                        else: 
                             print(f"No next level defined after {self.current_level_key}. Returning to menu.")
                             self.active_level_instance = None
                             self.current_game_state = "MENU"
@@ -114,8 +119,6 @@ class Game:
                         self.current_game_state = "MENU"
                     
                     elif level_status == "PAUSED": 
-                        # Simpan layar saat ini jika status PAUSED dikembalikan oleh level
-                        # (Meskipun lebih umum K_ESCAPE ditangani di loop utama Game)
                         if not hasattr(self, 'last_game_surface_before_pause'):
                              self.last_game_surface_before_pause = self.screen.copy()
                         self.current_game_state = "PAUSE_MENU"
@@ -144,5 +147,12 @@ if __name__ == '__main__':
     try:
         game.run()
     finally:
-        if hasattr(game, 'camera') and game.camera:
+        # --- PERUBAHAN UNTUK DEBUGGING ---
+        # Pastikan debugger dan kamera dihentikan dengan benar saat program keluar
+        print("\nExiting game...")
+        if hasattr(game, 'debugger'):
+            game.debugger.stop()
+        if hasattr(game, 'camera'):
             game.camera.release()
+        pygame.quit()
+        sys.exit()

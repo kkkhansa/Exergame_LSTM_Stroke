@@ -52,7 +52,7 @@ class Level:
         if self.game_camera:
             self.ui.set_camera(self.game_camera)
 
-        self.hearts_to_collect = 5
+        self.hearts_to_collect = 2
         self.level_complete = False
 
         self.manual_gesture_input_mode = False
@@ -160,7 +160,7 @@ class Level:
         
         self.visible_sprites.custom_draw(self.player)
         if hasattr(self, 'ui') and self.player:
-            self.ui.display(self.playe, self.hearts_to_collect)
+            self.ui.display(self.player, self.hearts_to_collect)
         
         return "RUNNING"
 

@@ -1,11 +1,11 @@
-# camera.py
+# camera_debug.py
 import cv2
 import mediapipe as mp
 import numpy as np
 import time
 from tensorflow.keras.models import load_model
 import pygame
-import math 
+import math
 
 # This code is used for capturing video from the camera and processing hand gestures using a pre-trained model.
 # It uses OpenCV for video capture and Mediapipe for hand detection and landmark extraction.
@@ -54,18 +54,24 @@ class HandGestureCamera:
         self.mp_draw = mp.solutions.drawing_utils
 
         # --- Dwell Time and State Machine ---
-        self.DWELL_TIME_SECONDS = 3  # How long to hold a gesture to confirm it
-        self.POST_ACTION_COOLDOWN = 0.5 # A short pause after an action to prevent immediate re-triggering
+        self.DWELL_TIME_SECONDS = 1.5
+        self.POST_ACTION_COOLDOWN = 0.5
 
-        self._potential_label = None          # The gesture currently being held
-        self._potential_label_start_time = 0  # Timestamp when the potential gesture was first seen
-        
-        self._action_to_consume = None        # The confirmed action label to be fetched by the game
-        
-        self._is_in_cooldown = False          # Flag to indicate if we are in the post-action cooldown phase
-        self._cooldown_end_time = 0           # Timestamp when the cooldown finishes
-        # --- End Dwell Time ---
+        self._potential_label = None
+        self._potential_label_start_time = 0
+        self._action_to_consume = None
+        self._is_in_cooldown = False
+        self._cooldown_end_time = 0
 
+        # --- DEBUGGING AND ANALYSIS VARIABLES ---
+        self.processing_latency_ms = 0  # ADDED FOR DEBUGGING: To store the latency of the process() method.
+        self.last_prediction_confidence = 0.0  # ADDED FOR DEBUGGING: To store the confidence of the last prediction.
+        self.landmark_status = "Not Detected" # ADDED FOR DEBUGGING: To store landmark detection status.
+        self.last_predicted_label = None # ADDED FOR DEBUGGING: To store the raw prediction label.
+
+    def get_game_fps(self):
+        return self.game_fps
+    
     def engineer_features(self, landmarks_np):
         """
         Downgraded feature engineering to produce 76 features to match the old model.
@@ -94,72 +100,78 @@ class HandGestureCamera:
         Processes a single camera frame to update the gesture dwell state machine.
         This should be called once per game loop.
         """
+        start_time = time.perf_counter() # ADDED FOR DEBUGGING: Start latency timer.
+
         if not self.is_camera_available or not self.model:
+            self.processing_latency_ms = (time.perf_counter() - start_time) * 1000 # ADDED FOR DEBUGGING
             return
 
-        # Check if we are in a post-action cooldown
         if self._is_in_cooldown and time.time() < self._cooldown_end_time:
+            self.processing_latency_ms = (time.perf_counter() - start_time) * 1000 # ADDED FOR DEBUGGING
             return
         elif self._is_in_cooldown:
-            self._is_in_cooldown = False # Cooldown finished, ready for next gesture
+            self._is_in_cooldown = False
 
         ret, frame = self.cap.read()
-        if not ret: return
+        if not ret: 
+            self.processing_latency_ms = (time.perf_counter() - start_time) * 1000 # ADDED FOR DEBUGGING
+            return
 
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         result = self.hands.process(image_rgb)
         
         current_prediction = None
         if result.multi_hand_landmarks:
+            self.landmark_status = f"Detected ({len(result.multi_hand_landmarks[0].landmark)} landmarks)" # ADDED FOR DEBUGGING
             try:
-                # Feature engineering and prediction
                 landmarks_raw_np = np.array([[lm.x, lm.y, lm.z] for lm in result.multi_hand_landmarks[0].landmark])
                 features = self.engineer_features(landmarks_raw_np)
                 model_input = np.reshape(features, (1, 1, -1))
                 prediction = self.model.predict(model_input, verbose=0)
+                
+                self.last_prediction_confidence = np.max(prediction) # ADDED FOR DEBUGGING
                 current_prediction = np.argmax(prediction)
+                self.last_predicted_label = current_prediction # ADDED FOR DEBUGGING
+                
             except Exception as e:
                 print(f"Error during gesture prediction: {e}")
                 current_prediction = None
-        
-        # --- State Machine Logic ---
-        # If the current prediction is idle (5), reset everything.
+                self.last_prediction_confidence = 0.0 # ADDED FOR DEBUGGING
+                self.last_predicted_label = None # ADDED FOR DEBUGGING
+        else:
+            self.landmark_status = "Not Detected" # ADDED FOR DEBUGGING
+            self.last_prediction_confidence = 0.0 # ADDED FOR DEBUGGING
+            self.last_predicted_label = None # ADDED FOR DEBUGGING
+
         if current_prediction == 5 or current_prediction is None:
             self._potential_label = None
             self._potential_label_start_time = 0
+            self.processing_latency_ms = (time.perf_counter() - start_time) * 1000 # ADDED FOR DEBUGGING
             return
 
-        # If the prediction is a new, non-idle gesture
         if current_prediction != self._potential_label:
             self._potential_label = current_prediction
             self._potential_label_start_time = time.time()
-        # If the same gesture is being held
         else:
             time_held = time.time() - self._potential_label_start_time
-            # If dwell time is exceeded, confirm the action and start cooldown
             if time_held >= self.DWELL_TIME_SECONDS:
                 print(f"ACTION CONFIRMED: {self._potential_label}")
                 self._action_to_consume = self._potential_label
-                self._potential_label = None # Reset potential label
+                self._potential_label = None
                 self._potential_label_start_time = 0
                 self._is_in_cooldown = True
                 self._cooldown_end_time = time.time() + self.POST_ACTION_COOLDOWN
+        
+        self.processing_latency_ms = (time.perf_counter() - start_time) * 1000 # ADDED FOR DEBUGGING: End latency timer.
 
+    # ... (sisa metode: consume_action, get_dwell_progress, get_frame, release) sama seperti file asli ...
     def consume_action(self):
-        """
-        Called by the game to get a confirmed action. Returns the label then resets.
-        This ensures an action is only processed once.
-        """
         action = self._action_to_consume
         if action is not None:
-            self._action_to_consume = None # Consume the action
+            self._action_to_consume = None
         return action
 
     def get_dwell_progress(self):
-        """
-        Returns the progress of the current dwell timer as a float (0.0 to 1.0).
-        Used by the UI to draw the clock.
-        """
         if self._potential_label is not None and self._potential_label_start_time > 0:
             time_held = time.time() - self._potential_label_start_time
             progress = min(time_held / self.DWELL_TIME_SECONDS, 1.0)
@@ -167,7 +179,6 @@ class HandGestureCamera:
         return 0.0
 
     def get_frame(self):
-        """Returns a Pygame surface of the current camera view for display."""
         if not self.is_camera_available:
             placeholder = pygame.Surface((160, 120))
             placeholder.fill((50, 50, 50))
@@ -179,13 +190,8 @@ class HandGestureCamera:
 
         ret, frame = self.cap.read()
         if not ret:
-            placeholder = pygame.Surface((160, 120))
-            placeholder.fill((50, 50, 50))
-            font = pygame.font.Font(None, 20)
-            text = font.render("Frame Error", True, (255, 255, 255))
-            text_rect = text.get_rect(center=(80, 60))
-            placeholder.blit(text, text_rect)
-            return placeholder
+            # Handle frame read error gracefully
+            return None 
 
         frame = cv2.flip(frame, 1)
         image_rgb_for_display = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
